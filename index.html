@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Goings On">
+<meta name="theme-color" content="#f1ebd9">
+<link rel="manifest" href="manifest.json">
+<title>Goings On About Town — For Juli</title>
+<style>
+  :root {
+    color-scheme: light;
+    --paper: #f1ebd9;
+    --paper-2: #ede6d0;
+    --ink: #1a1814;
+    --ink-2: #3a352c;
+    --ink-3: #7a7363;
+    --rule: #c8bfa4;
+    --rule-2: #a89e80;
+    --red: #b3001b;
+    --red-soft: #f0d8d8;
+    --serif: "Adobe Caslon Pro","ITC Caslon 224","Big Caslon","Hoefler Text","Garamond","Times New Roman",Times,serif;
+    --sans: "Neue Haas Grotesk Display","Helvetica Neue",Helvetica,Arial,sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 16px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  .page { max-width: 740px; margin: 0 auto; padding: 48px 40px 80px; }
+
+  a { color: inherit; text-decoration: none; }
+  a:hover { color: var(--red); }
+  button { font-family: inherit; cursor: pointer; }
+
+  /* ── AUTH GATE ── */
+  .auth-gate { display: none; min-height: 100vh; align-items: center; justify-content: center; padding: 24px; }
+  .auth-gate.show { display: flex; }
+  .auth-card { max-width: 380px; width: 100%; text-align: center; }
+  .auth-card .kicker { font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--ink-2); letter-spacing: 0.18em; text-transform: uppercase; margin: 0 0 14px; }
+  .auth-card .title { font-family: var(--serif); font-weight: 400; font-style: italic; font-size: 38px; line-height: 1.05; letter-spacing: -0.005em; margin: 0 0 24px; padding-bottom: 22px; border-bottom: 2px solid var(--ink); position: relative; }
+  .auth-card .title::after { content: ""; display: block; height: 1px; background: var(--ink); position: absolute; left: 0; right: 0; bottom: -3px; }
+  .auth-intro { font-family: var(--serif); font-style: italic; color: var(--ink-2); font-size: 14.5px; margin: 28px 0 22px; line-height: 1.6; }
+  #auth-form { display: flex; flex-direction: column; gap: 14px; align-items: stretch; }
+  #auth-email { background: transparent; border: none; border-bottom: 1px solid var(--rule-2); padding: 10px 0; font-family: var(--serif); font-style: italic; font-size: 16px; color: var(--ink); text-align: center; }
+  #auth-email:focus { outline: none; border-bottom-color: var(--ink); }
+  #auth-form button { background: var(--ink); color: var(--paper); border: none; padding: 11px 18px; font-family: var(--serif); font-variant: small-caps; font-size: 13px; letter-spacing: 0.14em; cursor: pointer; transition: background 0.2s; }
+  #auth-form button:hover:not(:disabled) { background: var(--red); }
+  #auth-form button:disabled { opacity: 0.5; cursor: default; }
+  .auth-status { font-family: var(--serif); font-style: italic; font-size: 13.5px; color: var(--ink-3); margin-top: 18px; min-height: 1.2em; line-height: 1.5; }
+  .auth-status.success { color: var(--red); }
+  .auth-status.error { color: var(--red); }
+
+  /* ── APP ── */
+  .app { display: none; }
+  .app.show { display: block; }
+
+  /* MASTHEAD */
+  .masthead { text-align: center; padding-bottom: 22px; border-bottom: 2px solid var(--ink); position: relative; }
+  .masthead::after { content: ""; display: block; height: 1px; background: var(--ink); margin-top: 3px; }
+  .kicker { font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--ink-2); letter-spacing: 0.18em; text-transform: uppercase; margin: 0 0 14px; }
+  .title { font-family: var(--serif); font-weight: 400; font-style: italic; font-size: 48px; line-height: 1; letter-spacing: -0.005em; margin: 0; }
+  .dateline { font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--ink-2); letter-spacing: 0.08em; margin-top: 12px; }
+  .dateline strong { font-weight: 500; color: var(--ink); font-variant: small-caps; letter-spacing: 0.14em; }
+
+  /* INTRO LINE */
+  .intro { text-align: center; font-style: italic; font-size: 14px; color: var(--ink-3); margin: 20px 0 36px; }
+  .intro .dot { display: inline-block; margin: 0 8px; color: var(--rule-2); }
+
+  /* SECTION BANNER */
+  .banner { display: flex; align-items: center; gap: 14px; margin: 44px 0 18px; }
+  .banner .rule { flex: 1; height: 1px; background: var(--ink); }
+  .banner .label { font-family: var(--serif); font-variant: small-caps; font-weight: 500; font-size: 17px; letter-spacing: 0.22em; color: var(--red); }
+  .banner .count { font-family: var(--serif); font-style: italic; font-size: 12px; color: var(--ink-3); letter-spacing: 0.04em; }
+
+  /* WEEKEND PANEL */
+  .weekend-intro { font-family: var(--serif); font-style: italic; color: var(--ink-2); font-size: 15px; line-height: 1.6; margin: 0 0 18px; }
+  .weekend-intro::first-letter { font-family: var(--serif); font-style: italic; float: left; font-size: 52px; line-height: 0.85; padding: 4px 8px 0 0; color: var(--red); }
+  .weekend-list { border-top: 1px solid var(--rule); }
+  .weekend-item { padding: 14px 0; border-bottom: 1px solid var(--rule); display: grid; grid-template-columns: 86px 1fr; gap: 18px; }
+  .weekend-item .dt { font-family: var(--serif); font-variant: small-caps; font-weight: 500; font-size: 12px; letter-spacing: 0.14em; color: var(--red); padding-top: 4px; }
+  .weekend-item .body p { margin: 0; font-family: var(--serif); font-size: 15.5px; line-height: 1.55; }
+  .weekend-item .body .name { font-weight: 500; }
+  .weekend-item .body .name a:hover { color: var(--red); }
+  .weekend-item .body .venue { font-style: italic; color: var(--ink-2); }
+  .weekend-item .body .desc { color: var(--ink-2); margin-top: 4px; }
+
+  /* CONTROL STRIP */
+  .controls { margin: 22px 0 16px; padding: 14px 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); display: flex; flex-direction: column; gap: 10px; }
+  .controls .row { display: flex; flex-wrap: wrap; gap: 6px 4px; align-items: baseline; }
+  .controls .row .lbl { font-family: var(--serif); font-style: italic; font-variant: small-caps; font-size: 12px; letter-spacing: 0.12em; color: var(--ink-3); margin-right: 10px; min-width: 64px; }
+  .chip {
+    background: transparent; border: none; padding: 3px 0;
+    font-family: var(--serif); font-size: 14px; color: var(--ink-2);
+    border-bottom: 1px solid transparent; margin-right: 14px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .chip:hover { color: var(--red); }
+  .chip.on { color: var(--ink); border-bottom-color: var(--ink); font-weight: 500; }
+  .chip.red.on { color: var(--red); border-bottom-color: var(--red); font-weight: 500; }
+  .search {
+    flex: 1; min-width: 180px; max-width: 260px;
+    background: transparent; border: none; border-bottom: 1px solid var(--rule-2);
+    padding: 4px 0; font-family: var(--serif); font-style: italic; font-size: 14px; color: var(--ink);
+  }
+  .search:focus { outline: none; border-bottom-color: var(--ink); }
+  .search::placeholder { color: var(--ink-3); font-style: italic; }
+
+  /* LISTINGS */
+  .listings { margin-top: 4px; }
+  .listing { padding: 22px 0; border-bottom: 1px solid var(--rule); display: grid; grid-template-columns: 1fr; gap: 8px; position: relative; }
+  .listing.first { border-top: 1px solid var(--rule); }
+  .listing.booked::before, .listing.interested::before {
+    content: ""; position: absolute; left: -14px; top: 24px; width: 4px; height: calc(100% - 36px);
+  }
+  .listing.booked::before { background: var(--ink); }
+  .listing.interested::before { background: var(--red); }
+  .listing.seen { opacity: 0.5; }
+
+  .l-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .l-cat { font-family: var(--serif); font-variant: small-caps; font-size: 11px; letter-spacing: 0.18em; color: var(--red); flex-shrink: 0; }
+  .l-dates { font-family: var(--serif); font-style: italic; font-size: 12.5px; color: var(--ink-3); letter-spacing: 0.04em; }
+
+  .l-title { font-family: var(--serif); font-style: italic; font-weight: 400; font-size: 22px; line-height: 1.2; margin: 4px 0 2px; letter-spacing: -0.005em; }
+  .l-title a { text-decoration: none; }
+  .l-title a:hover { color: var(--red); }
+
+  .l-venue { font-family: var(--serif); font-size: 14.5px; color: var(--ink-2); line-height: 1.45; }
+  .l-venue .where { font-style: italic; }
+  .l-venue .neighborhood { color: var(--ink-3); }
+  .l-venue .price { color: var(--ink-3); font-style: italic; }
+  .l-venue .price::before { content: " · "; color: var(--rule-2); }
+  .l-venue .neighborhood::before { content: " · "; color: var(--rule-2); }
+
+  .l-why { font-family: var(--serif); font-size: 15px; line-height: 1.55; color: var(--ink); margin-top: 4px; }
+
+  .badges { display: inline-flex; gap: 10px; margin-left: 6px; flex-wrap: wrap; }
+  .badge { font-family: var(--serif); font-variant: small-caps; font-style: italic; font-size: 11.5px; letter-spacing: 0.1em; padding: 1px 0; }
+  .badge.weekend { color: var(--red); }
+  .badge.urgent { color: var(--red); font-weight: 500; }
+  .badge.soon { color: var(--ink-2); }
+  .badge.future { color: var(--ink-3); }
+  .badge::before { content: "— "; color: var(--rule-2); }
+
+  .l-actions { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
+  .act {
+    background: none; border: none; padding: 0;
+    font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--ink-2);
+    letter-spacing: 0.03em;
+    border-bottom: 1px solid var(--rule-2);
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .act:hover { color: var(--ink); border-bottom-color: var(--ink); }
+  .act.on-interested { color: var(--red); border-bottom-color: var(--red); font-weight: 500; }
+  .act.on-booked { color: var(--ink); border-bottom-color: var(--ink); font-weight: 500; }
+  .act.on-seen { color: var(--ink-3); border-bottom-color: var(--ink-3); font-weight: 500; }
+  .l-actions .sep { color: var(--rule-2); font-style: italic; }
+
+  .empty { text-align: center; padding: 48px 0; font-style: italic; color: var(--ink-3); }
+  .loading { text-align: center; padding: 48px 0; font-style: italic; color: var(--ink-3); }
+
+  /* COLOPHON */
+  .colophon { margin-top: 56px; padding-top: 24px; border-top: 2px solid var(--ink); text-align: center; font-family: var(--serif); font-style: italic; font-size: 12px; color: var(--ink-3); letter-spacing: 0.04em; }
+  .colophon .ornament { display: block; margin: 0 auto 12px; font-size: 14px; color: var(--rule-2); letter-spacing: 0.6em; }
+  .colophon .signout { background: none; border: none; font: inherit; color: var(--ink-3); text-decoration: underline; text-decoration-style: dotted; cursor: pointer; padding: 0; margin-top: 8px; }
+  .colophon .signout:hover { color: var(--red); }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 22px 60px; }
+    .title { font-size: 36px; }
+    .weekend-item { grid-template-columns: 1fr; gap: 4px; }
+    .weekend-item .dt { padding-top: 0; }
+    .listing.booked::before, .listing.interested::before { left: -8px; }
+    .controls .row .lbl { min-width: 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- AUTH GATE -->
+<div class="auth-gate" id="auth-gate">
+  <div class="auth-card">
+    <p class="kicker">A Weekly Guide to NYC</p>
+    <h1 class="title">Goings On About Town</h1>
+    <p class="auth-intro">
+      Sign in to sync your <em>interested</em>, <em>booked</em>, and <em>seen</em> marks across your devices.
+    </p>
+    <form id="auth-form">
+      <input id="auth-email" type="email" placeholder="your email" autocomplete="email" required>
+      <button type="submit" id="auth-submit">Send sign-in link</button>
+    </form>
+    <p class="auth-status" id="auth-status"></p>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div class="app" id="app">
+  <div class="page">
+
+    <header class="masthead">
+      <p class="kicker">A Weekly Guide to NYC</p>
+      <h1 class="title">Goings On About Town</h1>
+      <div class="dateline">For <strong>Juli</strong> &nbsp;·&nbsp; <em id="dateline-date"></em></div>
+    </header>
+
+    <p class="intro" id="intro-line"></p>
+
+    <section>
+      <div class="banner">
+        <span class="label">This Weekend</span>
+        <span class="rule"></span>
+        <span class="count" id="weekend-count"></span>
+      </div>
+      <p class="weekend-intro" id="weekend-intro">A selection of what's worth your Friday through Sunday.</p>
+      <div class="weekend-list" id="weekend"></div>
+    </section>
+
+    <section>
+      <div class="banner">
+        <span class="label">The Full Calendar</span>
+        <span class="rule"></span>
+        <span class="count" id="filtered-count"></span>
+      </div>
+
+      <div class="controls">
+        <div class="row">
+          <span class="lbl">Category</span>
+          <button class="chip on" data-cat="all">All</button>
+          <button class="chip" data-cat="Theatre">Theatre</button>
+          <button class="chip" data-cat="Classical">Classical</button>
+          <button class="chip" data-cat="Opera">Opera</button>
+          <button class="chip" data-cat="Ballet">Ballet</button>
+          <button class="chip" data-cat="Film">Film</button>
+          <button class="chip" data-cat="Art">Art</button>
+          <button class="chip" data-cat="Concert">Concert</button>
+        </div>
+        <div class="row">
+          <span class="lbl">Status</span>
+          <button class="chip on" data-status="all">All</button>
+          <button class="chip" data-status="interested">Interested</button>
+          <button class="chip" data-status="booked">Booked</button>
+          <button class="chip" data-status="seen">Seen</button>
+          <button class="chip" data-status="none">Unmarked</button>
+          <button class="chip red" id="filter-soon" style="margin-left:auto">Closing soon</button>
+        </div>
+        <div class="row">
+          <span class="lbl">Search</span>
+          <input class="search" id="search" type="search" placeholder="title, venue, neighborhood…">
+        </div>
+      </div>
+
+      <div class="listings" id="listings"><div class="loading">Loading listings…</div></div>
+    </section>
+
+    <footer class="colophon">
+      <span class="ornament">· · ·</span>
+      Compiled from <em>The New Yorker</em>, the <em>Times</em>, <em>Time Out</em>, and venue calendars.<br>
+      Refreshed Sunday mornings &nbsp;·&nbsp; Synced across your devices.<br>
+      <button class="signout" id="signout-btn">Sign out</button>
+    </footer>
+
+  </div>
+</div>
+
+<script type="module">
+  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+  const SUPABASE_URL = 'https://kdaxubsmszojkdsxjpgs.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_Z31hI91ksy8uDB1x-sVP_A_aSuVVaF0';
+  const SOON_DAYS = 14;
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // ── DATE HELPERS ────────────────────────────────────────────
+  const TODAY = (() => { const d = new Date(); d.setHours(0,0,0,0); return d; })();
+
+  function computeWeekend() {
+    const dow = TODAY.getDay(); // 0=Sun..6=Sat
+    const start = new Date(TODAY);
+    let offset;
+    if (dow === 5)      offset = 0;      // Fri: today
+    else if (dow === 6) offset = 0;      // Sat: today (already in weekend)
+    else if (dow === 0) offset = 5;      // Sun: preview next Fri
+    else                offset = 5 - dow;// Mon-Thu: upcoming Fri
+    start.setDate(start.getDate() + offset);
+    const end = new Date(start);
+    end.setDate(end.getDate() + (dow === 6 ? 1 : 2));
+    end.setHours(23,59,59,999);
+    return { start, end };
+  }
+  const { start: WEEKEND_START, end: WEEKEND_END } = computeWeekend();
+
+  function daysUntil(dateStr) {
+    return Math.ceil((new Date(dateStr) - TODAY) / 86400000);
+  }
+  function fmtShort(dateStr) {
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+  function fmtRange(start, end) {
+    if (start === end) return fmtShort(start);
+    const sD = new Date(start), eD = new Date(end);
+    if (sD.getMonth() === eD.getMonth() && sD.getFullYear() === eD.getFullYear()) {
+      return sD.toLocaleDateString('en-US', { month:'short', day:'numeric' }) + '–' + eD.getDate();
+    }
+    return fmtShort(start) + ' – ' + fmtShort(end);
+  }
+  function fmtEditorialRun(start, end) {
+    const sD = new Date(start), eD = new Date(end);
+    if (start === end) return 'On ' + sD.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
+    if (eD < TODAY)  return 'Closed';
+    if (sD <= TODAY) return 'Through ' + eD.toLocaleDateString('en-US', { month:'long', day:'numeric' });
+    return 'Opens ' + sD.toLocaleDateString('en-US', { month:'long', day:'numeric' }) + ', through ' + eD.toLocaleDateString('en-US', { month:'long', day:'numeric' });
+  }
+  function closingBadge(end) {
+    const d = daysUntil(end);
+    if (d < 0) return null;
+    if (d === 0) return { text: 'Closes today', cls: 'urgent' };
+    if (d <= 7)  return { text: 'Closes in ' + d + ' day' + (d===1?'':'s'), cls: 'urgent' };
+    if (d <= 14) return { text: 'Closing soon', cls: 'soon' };
+    return null;
+  }
+  function futureBadge(start) {
+    const d = daysUntil(start);
+    if (d > 14) return { text: 'Opens ' + fmtShort(start), cls: 'future' };
+    return null;
+  }
+  function isThisWeekend(ev) {
+    const s = new Date(ev.start), e = new Date(ev.end);
+    return s <= WEEKEND_END && e >= WEEKEND_START;
+  }
+  function gcalUrl(ev) {
+    const fmt = d => d.replace(/-/g, '');
+    const start = fmt(ev.start);
+    const isOneNight = ev.start === ev.end;
+    let dates;
+    if (isOneNight) {
+      dates = start + 'T200000/' + start + 'T230000';
+    } else {
+      const eD = new Date(ev.end);
+      eD.setUTCDate(eD.getUTCDate() + 1);
+      dates = start + '/' + eD.toISOString().slice(0,10).replace(/-/g,'');
+    }
+    const params = new URLSearchParams({
+      action: 'TEMPLATE',
+      text: ev.title,
+      dates: dates,
+      details: ev.why + '\n\nTickets: ' + ev.url,
+      location: ev.venue + ', ' + ev.hood + ', NYC'
+    });
+    return 'https://calendar.google.com/calendar/render?' + params.toString();
+  }
+
+  // ── STATE ────────────────────────────────────────────────────
+  let session = null;
+  let events = [];
+  let statusMap = {};
+  const filters = { cat: 'all', status: 'all', soon: false, search: '' };
+
+  // ── DATA ─────────────────────────────────────────────────────
+  async function loadEvents() {
+    const { data, error } = await supabase
+      .from('weekend_events')
+      .select('*')
+      .eq('archived', false)
+      .order('end_date', { ascending: true });
+    if (error) { console.error(error); return; }
+    events = data.map(r => ({
+      id: r.id, title: r.title, cat: r.category, venue: r.venue, hood: r.neighborhood,
+      start: r.start_date, end: r.end_date, price: r.price, url: r.url, why: r.why
+    }));
+  }
+
+  async function loadStatus() {
+    if (!session) { statusMap = {}; return; }
+    const { data, error } = await supabase
+      .from('weekend_status')
+      .select('event_id, status')
+      .eq('user_id', session.user.id);
+    if (error) { console.error(error); return; }
+    statusMap = {};
+    data.forEach(r => { statusMap[r.event_id] = r.status; });
+  }
+
+  async function toggleStatus(eventId, newStatus) {
+    if (!session) return;
+    const current = statusMap[eventId];
+    if (current === newStatus) {
+      // Clear
+      delete statusMap[eventId];
+      render();
+      const { error } = await supabase
+        .from('weekend_status').delete()
+        .eq('user_id', session.user.id).eq('event_id', eventId);
+      if (error) { console.error(error); await loadStatus(); render(); }
+    } else {
+      statusMap[eventId] = newStatus;
+      render();
+      const { error } = await supabase
+        .from('weekend_status')
+        .upsert({ user_id: session.user.id, event_id: eventId, status: newStatus });
+      if (error) { console.error(error); await loadStatus(); render(); }
+    }
+  }
+
+  // ── RENDER ──────────────────────────────────────────────────
+  function render() {
+    // Dateline
+    document.getElementById('dateline-date').textContent =
+      TODAY.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+
+    // Intro stats
+    const interestedCount = Object.values(statusMap).filter(s => s === 'interested').length;
+    const bookedCount = Object.values(statusMap).filter(s => s === 'booked').length;
+    const closingCount = events.filter(ev => {
+      const d = daysUntil(ev.end);
+      return d >= 0 && d <= SOON_DAYS;
+    }).length;
+    document.getElementById('intro-line').innerHTML =
+      'Tracking <em>' + events.length + '</em> events <span class="dot">·</span> ' +
+      '<em>' + interestedCount + '</em> on your shortlist <span class="dot">·</span> ' +
+      '<em>' + bookedCount + '</em> booked <span class="dot">·</span> ' +
+      '<em>' + closingCount + '</em> closing within a fortnight.';
+
+    // Weekend
+    const weekendEvents = events.filter(isThisWeekend).sort((a,b) => new Date(a.start) - new Date(b.start));
+    const weekendEl = document.getElementById('weekend');
+    document.getElementById('weekend-count').textContent = weekendEvents.length + ' listing' + (weekendEvents.length === 1 ? '' : 's');
+    weekendEl.innerHTML = '';
+    if (!weekendEvents.length) {
+      weekendEl.innerHTML = '<div class="empty">Nothing matched for this weekend.</div>';
+    }
+    weekendEvents.forEach(ev => {
+      const div = document.createElement('div');
+      div.className = 'weekend-item';
+      div.innerHTML =
+        '<div class="dt">' + ev.cat + '<br>' + fmtRange(ev.start, ev.end) + '</div>' +
+        '<div class="body">' +
+          '<p class="name"><a href="' + ev.url + '" target="_blank" rel="noopener">' + ev.title + '</a></p>' +
+          '<p><span class="venue">' + ev.venue + ', ' + ev.hood + '.</span></p>' +
+          '<p class="desc">' + ev.why + '</p>' +
+        '</div>';
+      weekendEl.appendChild(div);
+    });
+
+    // Filtered listings
+    const filtered = events.filter(ev => {
+      if (filters.cat !== 'all' && ev.cat !== filters.cat) return false;
+      const s = statusMap[ev.id] || 'none';
+      if (filters.status !== 'all') {
+        if (filters.status === 'none' && s !== 'none') return false;
+        if (filters.status !== 'none' && s !== filters.status) return false;
+      }
+      if (filters.soon) {
+        const d = daysUntil(ev.end);
+        if (d < 0 || d > SOON_DAYS) return false;
+      }
+      if (filters.search) {
+        const q = filters.search.toLowerCase();
+        const hay = (ev.title + ' ' + ev.venue + ' ' + ev.hood + ' ' + ev.cat + ' ' + ev.why).toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    }).sort((a, b) => new Date(a.end) - new Date(b.end));
+
+    const list = document.getElementById('listings');
+    list.innerHTML = '';
+    document.getElementById('filtered-count').textContent = filtered.length + ' listing' + (filtered.length === 1 ? '' : 's');
+
+    if (!filtered.length) {
+      list.innerHTML = '<div class="empty">No listings match these filters.</div>';
+    }
+
+    filtered.forEach((ev, idx) => {
+      const status = statusMap[ev.id] || 'none';
+      const div = document.createElement('div');
+      div.className = 'listing' + (idx === 0 ? ' first' : '') + (status !== 'none' ? ' ' + status : '');
+
+      const cb = closingBadge(ev.end);
+      const fb = futureBadge(ev.start);
+      const wk = isThisWeekend(ev) ? '<span class="badge weekend">This weekend</span>' : '';
+      const closeB = cb ? '<span class="badge ' + cb.cls + '">' + cb.text + '</span>' : '';
+      const futB = fb ? '<span class="badge future">' + fb.text + '</span>' : '';
+
+      div.innerHTML =
+        '<div class="l-head">' +
+          '<span class="l-cat">' + ev.cat + '</span>' +
+          '<span class="l-dates"><em>' + fmtEditorialRun(ev.start, ev.end) + '</em>' +
+            '<span class="badges">' + wk + closeB + futB + '</span>' +
+          '</span>' +
+        '</div>' +
+        '<h3 class="l-title"><a href="' + ev.url + '" target="_blank" rel="noopener">' + ev.title + '</a></h3>' +
+        '<div class="l-venue"><span class="where">' + ev.venue + '</span>' +
+          '<span class="neighborhood">' + ev.hood + '</span>' +
+          '<span class="price">' + ev.price + '</span>' +
+        '</div>' +
+        '<p class="l-why">' + ev.why + '</p>' +
+        '<div class="l-actions">' +
+          '<button class="act ' + (status==='interested'?'on-interested':'') + '" data-st="interested">' +
+            (status==='interested'?'★ Interested':'☆ Interested') + '</button>' +
+          '<button class="act ' + (status==='booked'?'on-booked':'') + '" data-st="booked">' +
+            (status==='booked'?'✓ Booked':'Mark booked') + '</button>' +
+          '<button class="act ' + (status==='seen'?'on-seen':'') + '" data-st="seen">' +
+            (status==='seen'?'● Seen':'Mark seen') + '</button>' +
+          '<span class="sep">·</span>' +
+          '<a class="act" href="' + ev.url + '" target="_blank" rel="noopener">Tickets ↗</a>' +
+          '<a class="act" href="' + gcalUrl(ev) + '" target="_blank" rel="noopener">Add to calendar</a>' +
+        '</div>';
+
+      div.querySelectorAll('button.act[data-st]').forEach(btn => {
+        btn.addEventListener('click', () => toggleStatus(ev.id, btn.dataset.st));
+      });
+
+      list.appendChild(div);
+    });
+  }
+
+  // ── FILTER BINDINGS ─────────────────────────────────────────
+  document.querySelectorAll('.chip[data-cat]').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.chip[data-cat]').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+      filters.cat = b.dataset.cat;
+      render();
+    });
+  });
+  document.querySelectorAll('.chip[data-status]').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.chip[data-status]').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+      filters.status = b.dataset.status;
+      render();
+    });
+  });
+  document.getElementById('filter-soon').addEventListener('click', () => {
+    filters.soon = !filters.soon;
+    document.getElementById('filter-soon').classList.toggle('on', filters.soon);
+    render();
+  });
+  document.getElementById('search').addEventListener('input', e => {
+    filters.search = e.target.value;
+    render();
+  });
+
+  // ── AUTH UI ─────────────────────────────────────────────────
+  const authGate = document.getElementById('auth-gate');
+  const appEl = document.getElementById('app');
+  const authForm = document.getElementById('auth-form');
+  const authEmail = document.getElementById('auth-email');
+  const authSubmit = document.getElementById('auth-submit');
+  const authStatus = document.getElementById('auth-status');
+
+  function showGate() { authGate.classList.add('show'); appEl.classList.remove('show'); }
+  function showApp()  { authGate.classList.remove('show'); appEl.classList.add('show'); }
+
+  authForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = authEmail.value.trim();
+    if (!email) return;
+    authSubmit.disabled = true;
+    authStatus.className = 'auth-status';
+    authStatus.textContent = 'Sending…';
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.origin }
+    });
+    if (error) {
+      authStatus.className = 'auth-status error';
+      authStatus.textContent = error.message;
+      authSubmit.disabled = false;
+    } else {
+      authStatus.className = 'auth-status success';
+      authStatus.textContent = 'Check your email for the sign-in link.';
+    }
+  });
+
+  document.getElementById('signout-btn').addEventListener('click', async () => {
+    await supabase.auth.signOut();
+  });
+
+  // ── BOOT ────────────────────────────────────────────────────
+  supabase.auth.onAuthStateChange(async (_event, newSession) => {
+    session = newSession;
+    if (session) {
+      showApp();
+      await Promise.all([loadEvents(), loadStatus()]);
+      render();
+    } else {
+      showGate();
+    }
+  });
+
+  // Initial session check (in case onAuthStateChange doesn't fire first)
+  const { data: { session: initial } } = await supabase.auth.getSession();
+  session = initial;
+  if (session) {
+    showApp();
+    await Promise.all([loadEvents(), loadStatus()]);
+    render();
+  } else {
+    showGate();
+  }
+
+  // ── SERVICE WORKER ──────────────────────────────────────────
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+</script>
+</body>
+</html>
