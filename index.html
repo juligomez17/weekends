@@ -49,12 +49,17 @@
   .auth-card .title { font-family: var(--serif); font-weight: 400; font-style: italic; font-size: 38px; line-height: 1.05; letter-spacing: -0.005em; margin: 0 0 24px; padding-bottom: 22px; border-bottom: 2px solid var(--ink); position: relative; }
   .auth-card .title::after { content: ""; display: block; height: 1px; background: var(--ink); position: absolute; left: 0; right: 0; bottom: -3px; }
   .auth-intro { font-family: var(--serif); font-style: italic; color: var(--ink-2); font-size: 14.5px; margin: 28px 0 22px; line-height: 1.6; }
-  #auth-form { display: flex; flex-direction: column; gap: 14px; align-items: stretch; }
-  #auth-email { background: transparent; border: none; border-bottom: 1px solid var(--rule-2); padding: 10px 0; font-family: var(--serif); font-style: italic; font-size: 16px; color: var(--ink); text-align: center; }
-  #auth-email:focus { outline: none; border-bottom-color: var(--ink); }
-  #auth-form button { background: var(--ink); color: var(--paper); border: none; padding: 11px 18px; font-family: var(--serif); font-variant: small-caps; font-size: 13px; letter-spacing: 0.14em; cursor: pointer; transition: background 0.2s; }
-  #auth-form button:hover:not(:disabled) { background: var(--red); }
-  #auth-form button:disabled { opacity: 0.5; cursor: default; }
+  .auth-form { display: flex; flex-direction: column; gap: 14px; align-items: stretch; }
+  .auth-form input { background: transparent; border: none; border-bottom: 1px solid var(--rule-2); padding: 10px 0; font-family: var(--serif); font-style: italic; font-size: 16px; color: var(--ink); text-align: center; }
+  .auth-form input:focus { outline: none; border-bottom-color: var(--ink); }
+  #auth-code { letter-spacing: 0.5em; font-variant-numeric: tabular-nums; font-style: normal; font-size: 22px; padding: 14px 0; }
+  .auth-form button { background: var(--ink); color: var(--paper); border: none; padding: 11px 18px; font-family: var(--serif); font-variant: small-caps; font-size: 13px; letter-spacing: 0.14em; cursor: pointer; transition: background 0.2s; }
+  .auth-form button:hover:not(:disabled) { background: var(--red); }
+  .auth-form button:disabled { opacity: 0.5; cursor: default; }
+  .auth-step { display: none; }
+  .auth-step.show { display: flex; flex-direction: column; gap: 14px; }
+  .auth-back { background: none; border: none; font: inherit; font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--ink-3); text-decoration: underline; text-decoration-style: dotted; cursor: pointer; margin-top: 4px; padding: 0; align-self: center; }
+  .auth-back:hover { color: var(--red); }
   .auth-status { font-family: var(--serif); font-style: italic; font-size: 13.5px; color: var(--ink-3); margin-top: 18px; min-height: 1.2em; line-height: 1.5; }
   .auth-status.success { color: var(--red); }
   .auth-status.error { color: var(--red); }
@@ -193,10 +198,19 @@
     <p class="auth-intro">
       Sign in to sync your <em>interested</em>, <em>booked</em>, and <em>seen</em> marks across your devices.
     </p>
-    <form id="auth-form">
+
+    <form class="auth-form auth-step show" id="auth-step-email">
       <input id="auth-email" type="email" placeholder="your email" autocomplete="email" required>
-      <button type="submit" id="auth-submit">Send sign-in link</button>
+      <button type="submit" id="auth-send">Send sign-in code</button>
     </form>
+
+    <form class="auth-form auth-step" id="auth-step-code">
+      <input id="auth-code" type="text" inputmode="numeric" autocomplete="one-time-code"
+             pattern="[0-9]*" maxlength="6" placeholder="······" required>
+      <button type="submit" id="auth-verify">Verify code</button>
+      <button type="button" class="auth-back" id="auth-back">Use a different email</button>
+    </form>
+
     <p class="auth-status" id="auth-status"></p>
   </div>
 </div>
@@ -550,39 +564,92 @@
   });
 
   // ── AUTH UI ─────────────────────────────────────────────────
-  const authGate = document.getElementById('auth-gate');
-  const appEl = document.getElementById('app');
-  const authForm = document.getElementById('auth-form');
-  const authEmail = document.getElementById('auth-email');
-  const authSubmit = document.getElementById('auth-submit');
-  const authStatus = document.getElementById('auth-status');
+  const authGate     = document.getElementById('auth-gate');
+  const appEl        = document.getElementById('app');
+  const stepEmail    = document.getElementById('auth-step-email');
+  const stepCode     = document.getElementById('auth-step-code');
+  const inputEmail   = document.getElementById('auth-email');
+  const inputCode    = document.getElementById('auth-code');
+  const btnSend      = document.getElementById('auth-send');
+  const btnVerify    = document.getElementById('auth-verify');
+  const btnBack      = document.getElementById('auth-back');
+  const authStatus   = document.getElementById('auth-status');
+
+  let pendingEmail = '';
 
   function showGate() { authGate.classList.add('show'); appEl.classList.remove('show'); }
   function showApp()  { authGate.classList.remove('show'); appEl.classList.add('show'); }
 
-  authForm.addEventListener('submit', async (e) => {
+  function showStep(which) {
+    stepEmail.classList.toggle('show', which === 'email');
+    stepCode.classList.toggle('show', which === 'code');
+  }
+
+  function setStatus(msg, cls) {
+    authStatus.className = 'auth-status' + (cls ? ' ' + cls : '');
+    authStatus.textContent = msg || '';
+  }
+
+  // Step 1: send code
+  stepEmail.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const email = authEmail.value.trim();
+    const email = inputEmail.value.trim();
     if (!email) return;
-    authSubmit.disabled = true;
-    authStatus.className = 'auth-status';
-    authStatus.textContent = 'Sending…';
+    btnSend.disabled = true;
+    setStatus('Sending code…');
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: window.location.origin }
+      options: { shouldCreateUser: true }
     });
     if (error) {
-      authStatus.className = 'auth-status error';
-      authStatus.textContent = error.message;
-      authSubmit.disabled = false;
+      setStatus(error.message, 'error');
+      btnSend.disabled = false;
     } else {
-      authStatus.className = 'auth-status success';
-      authStatus.textContent = 'Check your email for the sign-in link.';
+      pendingEmail = email;
+      setStatus('Check your email for a 6-digit code.', 'success');
+      showStep('code');
+      btnSend.disabled = false;
+      setTimeout(() => inputCode.focus(), 50);
     }
+  });
+
+  // Step 2: verify code
+  stepCode.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const token = inputCode.value.trim();
+    if (!token || !pendingEmail) return;
+    btnVerify.disabled = true;
+    setStatus('Verifying…');
+    const { error } = await supabase.auth.verifyOtp({
+      email: pendingEmail,
+      token,
+      type: 'email'
+    });
+    if (error) {
+      setStatus(error.message, 'error');
+      btnVerify.disabled = false;
+    } else {
+      // onAuthStateChange will swap to the app
+      setStatus('');
+      inputCode.value = '';
+    }
+  });
+
+  // Back to email step
+  btnBack.addEventListener('click', () => {
+    pendingEmail = '';
+    inputCode.value = '';
+    setStatus('');
+    showStep('email');
+    setTimeout(() => inputEmail.focus(), 50);
   });
 
   document.getElementById('signout-btn').addEventListener('click', async () => {
     await supabase.auth.signOut();
+    showStep('email');
+    inputEmail.value = '';
+    inputCode.value = '';
+    pendingEmail = '';
   });
 
   // ── BOOT ────────────────────────────────────────────────────
