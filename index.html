@@ -190,33 +190,13 @@
 </head>
 <body>
 
-<!-- AUTH GATE -->
-<div class="auth-gate" id="auth-gate">
-  <div class="auth-card">
-    <p class="kicker">A Weekly Guide to NYC</p>
-    <h1 class="title">Goings On About Town</h1>
-    <p class="auth-intro">
-      Sign in to sync your <em>interested</em>, <em>booked</em>, and <em>seen</em> marks across your devices.
-    </p>
-
-    <form class="auth-form auth-step show" id="auth-step-email">
-      <input id="auth-email" type="email" placeholder="your email" autocomplete="email" required>
-      <button type="submit" id="auth-send">Send sign-in code</button>
-    </form>
-
-    <form class="auth-form auth-step" id="auth-step-code">
-      <input id="auth-code" type="text" inputmode="numeric" autocomplete="one-time-code"
-             maxlength="8" placeholder="········" required>
-      <button type="submit" id="auth-verify">Verify code</button>
-      <button type="button" class="auth-back" id="auth-back">Use a different email</button>
-    </form>
-
-    <p class="auth-status" id="auth-status"></p>
-  </div>
-</div>
+<!-- AUTH GATE REMOVED — app is now publicly accessible.
+     Sensitive cross-app data stays protected by RLS; this app only
+     touches weekend_events (public catalog) and weekend_status, which
+     has an anon-role policy scoped to Juli's user_id. -->
 
 <!-- MAIN APP -->
-<div class="app" id="app">
+<div class="app show" id="app">
   <div class="page">
 
     <header class="masthead">
@@ -278,7 +258,6 @@
       <span class="ornament">· · ·</span>
       Compiled from <em>The New Yorker</em>, the <em>Times</em>, <em>Time Out</em>, and venue calendars.<br>
       Refreshed Sunday mornings &nbsp;·&nbsp; Synced across your devices.<br>
-      <button class="signout" id="signout-btn">Sign out</button>
     </footer>
 
   </div>
@@ -291,7 +270,13 @@
   const SUPABASE_ANON_KEY = 'sb_publishable_Z31hI91ksy8uDB1x-sVP_A_aSuVVaF0';
   const SOON_DAYS = 14;
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+
+  // Public app — no auth. All queries use Juli's hardcoded user_id.
+  // Anon role has scoped RLS policy for weekend_status (migration 005).
+  const JULI_USER_ID = 'b87e0ad9-cb4c-4452-b523-c28249fece62';
 
   // ── DATE HELPERS ────────────────────────────────────────────
   const TODAY = (() => { const d = new Date(); d.setHours(0,0,0,0); return d; })();
@@ -373,7 +358,6 @@
   }
 
   // ── STATE ────────────────────────────────────────────────────
-  let session = null;
   let events = [];
   let statusMap = {};
   const filters = { cat: 'all', status: 'all', soon: false, search: '' };
@@ -393,18 +377,16 @@
   }
 
   async function loadStatus() {
-    if (!session) { statusMap = {}; return; }
     const { data, error } = await supabase
       .from('weekend_status')
       .select('event_id, status')
-      .eq('user_id', session.user.id);
+      .eq('user_id', JULI_USER_ID);
     if (error) { console.error(error); return; }
     statusMap = {};
     data.forEach(r => { statusMap[r.event_id] = r.status; });
   }
 
   async function toggleStatus(eventId, newStatus) {
-    if (!session) return;
     const current = statusMap[eventId];
     if (current === newStatus) {
       // Clear
@@ -412,14 +394,14 @@
       render();
       const { error } = await supabase
         .from('weekend_status').delete()
-        .eq('user_id', session.user.id).eq('event_id', eventId);
+        .eq('user_id', JULI_USER_ID).eq('event_id', eventId);
       if (error) { console.error(error); await loadStatus(); render(); }
     } else {
       statusMap[eventId] = newStatus;
       render();
       const { error } = await supabase
         .from('weekend_status')
-        .upsert({ user_id: session.user.id, event_id: eventId, status: newStatus });
+        .upsert({ user_id: JULI_USER_ID, event_id: eventId, status: newStatus });
       if (error) { console.error(error); await loadStatus(); render(); }
     }
   }
@@ -563,117 +545,9 @@
     render();
   });
 
-  // ── AUTH UI ─────────────────────────────────────────────────
-  const authGate     = document.getElementById('auth-gate');
-  const appEl        = document.getElementById('app');
-  const stepEmail    = document.getElementById('auth-step-email');
-  const stepCode     = document.getElementById('auth-step-code');
-  const inputEmail   = document.getElementById('auth-email');
-  const inputCode    = document.getElementById('auth-code');
-  const btnSend      = document.getElementById('auth-send');
-  const btnVerify    = document.getElementById('auth-verify');
-  const btnBack      = document.getElementById('auth-back');
-  const authStatus   = document.getElementById('auth-status');
-
-  let pendingEmail = '';
-
-  function showGate() { authGate.classList.add('show'); appEl.classList.remove('show'); }
-  function showApp()  { authGate.classList.remove('show'); appEl.classList.add('show'); }
-
-  function showStep(which) {
-    stepEmail.classList.toggle('show', which === 'email');
-    stepCode.classList.toggle('show', which === 'code');
-  }
-
-  function setStatus(msg, cls) {
-    authStatus.className = 'auth-status' + (cls ? ' ' + cls : '');
-    authStatus.textContent = msg || '';
-  }
-
-  // Step 1: send code
-  stepEmail.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email = inputEmail.value.trim();
-    if (!email) return;
-    btnSend.disabled = true;
-    setStatus('Sending code…');
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { shouldCreateUser: true }
-    });
-    if (error) {
-      setStatus(error.message, 'error');
-      btnSend.disabled = false;
-    } else {
-      pendingEmail = email;
-      setStatus('Check your email for a 6-digit code.', 'success');
-      showStep('code');
-      btnSend.disabled = false;
-      setTimeout(() => inputCode.focus(), 50);
-    }
-  });
-
-  // Step 2: verify code
-  stepCode.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const token = inputCode.value.trim();
-    if (!token || !pendingEmail) return;
-    btnVerify.disabled = true;
-    setStatus('Verifying…');
-    const { error } = await supabase.auth.verifyOtp({
-      email: pendingEmail,
-      token,
-      type: 'email'
-    });
-    if (error) {
-      setStatus(error.message, 'error');
-      btnVerify.disabled = false;
-    } else {
-      // onAuthStateChange will swap to the app
-      setStatus('');
-      inputCode.value = '';
-    }
-  });
-
-  // Back to email step
-  btnBack.addEventListener('click', () => {
-    pendingEmail = '';
-    inputCode.value = '';
-    setStatus('');
-    showStep('email');
-    setTimeout(() => inputEmail.focus(), 50);
-  });
-
-  document.getElementById('signout-btn').addEventListener('click', async () => {
-    await supabase.auth.signOut();
-    showStep('email');
-    inputEmail.value = '';
-    inputCode.value = '';
-    pendingEmail = '';
-  });
-
-  // ── BOOT ────────────────────────────────────────────────────
-  supabase.auth.onAuthStateChange(async (_event, newSession) => {
-    session = newSession;
-    if (session) {
-      showApp();
-      await Promise.all([loadEvents(), loadStatus()]);
-      render();
-    } else {
-      showGate();
-    }
-  });
-
-  // Initial session check (in case onAuthStateChange doesn't fire first)
-  const { data: { session: initial } } = await supabase.auth.getSession();
-  session = initial;
-  if (session) {
-    showApp();
-    await Promise.all([loadEvents(), loadStatus()]);
-    render();
-  } else {
-    showGate();
-  }
+  // ── BOOT (no auth — public app, queries hardcoded to JULI_USER_ID) ──
+  await Promise.all([loadEvents(), loadStatus()]);
+  render();
 
   // ── SERVICE WORKER ──────────────────────────────────────────
   if ('serviceWorker' in navigator) {
