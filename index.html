@@ -637,10 +637,55 @@
     return wrap;
   }
 
+  // ── BOOKED VIEW (on the books, by category) ─────────────────
+  function buildBookedView() {
+    const wrap = document.createElement('div');
+    const booked = live().filter(ev => statusMap[ev.id] === 'booked');
+    const sec = document.createElement('section');
+    sec.innerHTML = banner('On the Books', booked.length ? booked.length + ' booked' : '');
+    if (!booked.length) {
+      const e = document.createElement('div');
+      e.className = 'empty';
+      e.innerHTML = 'Nothing booked yet. Mark an event <em>Booked</em> and it collects here by category, in date order.';
+      sec.appendChild(e); wrap.appendChild(sec); return wrap;
+    }
+    const cats = [...new Set(booked.map(ev => ev.cat))]
+      .sort((a, b) => (((CAT_ORDER.indexOf(a) + 1) || 99) - ((CAT_ORDER.indexOf(b) + 1) || 99)));
+    cats.forEach(cat => {
+      const inCat = booked.filter(ev => ev.cat === cat).sort((a, b) => new Date(a.start) - new Date(b.start));
+      const h = document.createElement('div');
+      h.className = 'radar-sub';
+      h.textContent = cat + ' · ' + inCat.length;
+      sec.appendChild(h);
+      const list = document.createElement('div');
+      list.className = 'weekend-list';
+      inCat.forEach(ev => {
+        const div = document.createElement('div');
+        div.className = 'weekend-item';
+        div.innerHTML =
+          '<div class="dt">' + fmtRange(ev.start, ev.end) + '</div>' +
+          '<div class="body">' +
+            '<p class="name"><a href="' + ev.url + '" target="_blank" rel="noopener">' + ev.title + '</a></p>' +
+            '<p><span class="venue">' + ev.venue + (ev.hood ? ', ' + ev.hood : '') + '.</span></p>' +
+            '<div class="l-actions" style="margin-top:6px">' +
+              '<a class="act" href="' + gcalUrl(ev) + '" target="_blank" rel="noopener">Add to calendar</a>' +
+              '<button class="act" data-st="seen">Mark seen</button>' +
+              '<button class="act" data-st="booked">Unbook</button>' +
+            '</div>' +
+          '</div>';
+        div.querySelectorAll('button[data-st]').forEach(b => b.addEventListener('click', () => toggleStatus(ev.id, b.dataset.st)));
+        list.appendChild(div);
+      });
+      sec.appendChild(list);
+    });
+    wrap.appendChild(sec);
+    return wrap;
+  }
+
   // ── TABS + DISPATCH ─────────────────────────────────────────
   function renderTabs() {
     const removedCount = events.filter(ev => statusMap[ev.id] === 'dismissed').length;
-    const tabs = ['Radar', ...categoriesInData()];
+    const tabs = ['Radar', 'Booked', ...categoriesInData()];
     if (removedCount) tabs.push('Removed');
     if (!tabs.includes(activeTab)) activeTab = 'Radar';
     const nav = document.getElementById('tabs');
@@ -650,6 +695,7 @@
       b.className = 'tab' + (t === activeTab ? ' on' : '');
       let n = '';
       if (t === 'Radar') n = live().filter(ev => radarAction(ev)).length;
+      else if (t === 'Booked') n = live().filter(ev => statusMap[ev.id] === 'booked').length;
       else if (t === 'Removed') n = removedCount;
       else n = live().filter(ev => ev.cat === t).length;
       b.innerHTML = t + (n ? ' <span class="tcount">' + n + '</span>' : '');
@@ -663,6 +709,7 @@
     view.innerHTML = '';
     let node;
     if (activeTab === 'Radar') node = buildRadarView();
+    else if (activeTab === 'Booked') node = buildBookedView();
     else if (activeTab === 'Removed') node = buildRemovedView();
     else node = buildCategoryView(activeTab);
     view.appendChild(node);
