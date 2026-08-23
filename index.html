@@ -195,6 +195,20 @@
     .radar-item .rcta { flex-direction: row; gap: 14px; align-items: baseline; margin-top: 6px; }
   }
 
+  /* TABS */
+  .tabs { display: flex; flex-wrap: wrap; gap: 4px 20px; margin: 26px 0 22px; border-bottom: 1px solid var(--rule); }
+  .tab { background: none; border: none; padding: 6px 0 10px; font-family: var(--serif); font-variant: small-caps; font-size: 15px; letter-spacing: 0.1em; color: var(--ink-3); border-bottom: 2px solid transparent; }
+  .tab:hover { color: var(--red); }
+  .tab.on { color: var(--ink); border-bottom-color: var(--red); font-weight: 500; }
+  .tab .tcount { font-size: 10.5px; font-variant: normal; letter-spacing: 0; color: var(--ink-3); margin-left: 3px; }
+  #view section + section { margin-top: 40px; }
+  .act.remove { color: var(--ink-3); border-bottom-color: var(--rule); margin-left: auto; }
+  .act.remove:hover { color: var(--red); border-bottom-color: var(--red); }
+  .radar-item .rcta button.rremove { color: var(--ink-3); border-bottom: none; }
+  .radar-item .rcta button.rremove:hover { color: var(--red); }
+  .removed-item { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--rule); font-family: var(--serif); font-size: 15px; color: var(--ink-2); }
+  .removed-item em { color: var(--ink-3); font-size: 12px; }
+
   /* COLOPHON */
   .colophon { margin-top: 56px; padding-top: 24px; border-top: 2px solid var(--ink); text-align: center; font-family: var(--serif); font-style: italic; font-size: 12px; color: var(--ink-3); letter-spacing: 0.04em; }
   .colophon .ornament { display: block; margin: 0 auto 12px; font-size: 14px; color: var(--rule-2); letter-spacing: 0.6em; }
@@ -230,62 +244,8 @@
 
     <p class="intro" id="intro-line"></p>
 
-    <section class="radar">
-      <div class="banner">
-        <span class="label">On Your Radar — Act Soon</span>
-        <span class="rule"></span>
-        <span class="count" id="radar-count"></span>
-      </div>
-      <div class="radar-list" id="radar"><div class="loading">Checking your radar…</div></div>
-    </section>
-
-    <section>
-      <div class="banner">
-        <span class="label">This Weekend</span>
-        <span class="rule"></span>
-        <span class="count" id="weekend-count"></span>
-      </div>
-      <p class="weekend-intro" id="weekend-intro">A selection of what's worth your Friday through Sunday.</p>
-      <div class="weekend-list" id="weekend"></div>
-    </section>
-
-    <section>
-      <div class="banner">
-        <span class="label">The Full Calendar</span>
-        <span class="rule"></span>
-        <span class="count" id="filtered-count"></span>
-      </div>
-
-      <div class="controls">
-        <div class="row">
-          <span class="lbl">Category</span>
-          <button class="chip on" data-cat="all">All</button>
-          <button class="chip" data-cat="Theatre">Theatre</button>
-          <button class="chip" data-cat="Classical">Classical</button>
-          <button class="chip" data-cat="Opera">Opera</button>
-          <button class="chip" data-cat="Ballet">Ballet</button>
-          <button class="chip" data-cat="Film">Film</button>
-          <button class="chip" data-cat="Art">Art</button>
-          <button class="chip" data-cat="Concert">Concert</button>
-        </div>
-        <div class="row">
-          <span class="lbl">Status</span>
-          <button class="chip on" data-status="all">All</button>
-          <button class="chip" data-status="interested">Interested</button>
-          <button class="chip" data-status="booked">Booked</button>
-          <button class="chip" data-status="seen">Seen</button>
-          <button class="chip" data-status="none">Unmarked</button>
-          <button class="chip foryou" id="filter-foryou" style="margin-left:auto">★ For you</button>
-          <button class="chip red" id="filter-soon">Closing soon</button>
-        </div>
-        <div class="row">
-          <span class="lbl">Search</span>
-          <input class="search" id="search" type="search" placeholder="title, venue, neighborhood…">
-        </div>
-      </div>
-
-      <div class="listings" id="listings"><div class="loading">Loading listings…</div></div>
-    </section>
+    <nav class="tabs" id="tabs"></nav>
+    <div id="view"><div class="loading">Loading…</div></div>
 
     <footer class="colophon">
       <span class="ornament">· · ·</span>
@@ -478,83 +438,111 @@
     }
   }
 
-  // ── BOOKING RADAR RENDER ────────────────────────────────────
-  function renderRadar() {
-    const el = document.getElementById('radar');
-    const cnt = document.getElementById('radar-count');
-    if (!el) return;
-    const scored = events.map(ev => ({ ev, act: radarAction(ev) })).filter(x => x.act);
+  // ── VIEW HELPERS ────────────────────────────────────────────
+  let activeTab = 'Radar';
+  const live = () => events.filter(ev => statusMap[ev.id] !== 'dismissed');
+  const CAT_ORDER = ['Art','Film','Theatre','Classical','Concert','Opera','Ballet','Dance'];
+  function categoriesInData() {
+    const present = [...new Set(live().map(ev => ev.cat).filter(Boolean))];
+    return present.sort((a, b) => (((CAT_ORDER.indexOf(a) + 1) || 99) - ((CAT_ORDER.indexOf(b) + 1) || 99)));
+  }
+  function banner(label, count) {
+    return '<div class="banner"><span class="label">' + label + '</span>' +
+           '<span class="rule"></span><span class="count">' + (count || '') + '</span></div>';
+  }
+
+  // ── LISTING CARD ────────────────────────────────────────────
+  function buildListing(ev, idx) {
+    const status = statusMap[ev.id] || 'none';
+    const div = document.createElement('div');
+    div.className = 'listing' + (idx === 0 ? ' first' : '') + (status !== 'none' ? ' ' + status : '');
+    const cb = closingBadge(ev.end);
+    const fb = futureBadge(ev.start);
+    const wk = isThisWeekend(ev) ? '<span class="badge weekend">This weekend</span>' : '';
+    const closeB = cb ? '<span class="badge ' + cb.cls + '">' + cb.text + '</span>' : '';
+    const futB = fb ? '<span class="badge future">' + fb.text + '</span>' : '';
+    const fy = tasteScore(ev) >= FORYOU_MIN ? '<span class="badge foryou">For you</span>' : '';
+    div.innerHTML =
+      '<div class="l-head">' +
+        '<span class="l-cat">' + ev.cat + '</span>' +
+        '<span class="l-dates"><em>' + fmtEditorialRun(ev.start, ev.end) + '</em>' +
+          '<span class="badges">' + fy + wk + closeB + futB + '</span>' +
+        '</span>' +
+      '</div>' +
+      '<h3 class="l-title"><a href="' + ev.url + '" target="_blank" rel="noopener">' + ev.title + '</a></h3>' +
+      '<div class="l-venue"><span class="where">' + ev.venue + '</span>' +
+        '<span class="neighborhood">' + ev.hood + '</span>' +
+        '<span class="price">' + (ev.price || '') + '</span>' +
+      '</div>' +
+      '<p class="l-why">' + (ev.why || '') + '</p>' +
+      '<div class="l-actions">' +
+        '<button class="act ' + (status==='interested'?'on-interested':'') + '" data-st="interested">' + (status==='interested'?'★ Interested':'☆ Interested') + '</button>' +
+        '<button class="act ' + (status==='booked'?'on-booked':'') + '" data-st="booked">' + (status==='booked'?'✓ Booked':'Mark booked') + '</button>' +
+        '<button class="act ' + (status==='seen'?'on-seen':'') + '" data-st="seen">' + (status==='seen'?'● Seen':'Mark seen') + '</button>' +
+        '<a class="act" href="' + ev.url + '" target="_blank" rel="noopener">Tickets ↗</a>' +
+        '<a class="act" href="' + gcalUrl(ev) + '" target="_blank" rel="noopener">Add to calendar</a>' +
+        '<button class="act remove" data-st="dismissed" title="Remove from app">✕ Remove</button>' +
+      '</div>';
+    div.querySelectorAll('button.act[data-st]').forEach(btn => btn.addEventListener('click', () => toggleStatus(ev.id, btn.dataset.st)));
+    return div;
+  }
+
+  // ── RADAR VIEW (Act Soon + This Weekend) ────────────────────
+  function buildRadarView() {
+    const wrap = document.createElement('div');
+    const scored = live().map(ev => ({ ev, act: radarAction(ev) })).filter(x => x.act);
     const book = scored.filter(x => x.act.cls !== 'soft').sort((a, b) => a.act.date - b.act.date);
     const closing = scored.filter(x => x.act.cls === 'soft').sort((a, b) => a.act.date - b.act.date).slice(0, 6);
     const total = book.length + closing.length;
-    cnt.textContent = total ? total + ' to act on' : '';
-    el.innerHTML = '';
+    const sec = document.createElement('section');
+    sec.className = 'radar';
+    sec.innerHTML = banner('On Your Radar — Act Soon', total ? total + ' to act on' : '');
+    const listEl = document.createElement('div');
+    listEl.className = 'radar-list';
     if (!total) {
-      el.innerHTML = '<div class="radar-empty">Nothing needs booking right now — you’re clear.</div>';
-      return;
+      listEl.innerHTML = '<div class="radar-empty">Nothing needs booking right now — you’re clear.</div>';
+    } else {
+      const item = ({ ev, act }) => {
+        const st = statusMap[ev.id] || 'none';
+        const div = document.createElement('div');
+        div.className = 'radar-item';
+        div.innerHTML =
+          '<div class="when ' + act.cls + '">' + act.label + '</div>' +
+          '<div class="rbody">' +
+            '<div class="rtitle"><a href="' + ev.url + '" target="_blank" rel="noopener">' + ev.title + '</a></div>' +
+            '<div class="rmeta">' + ev.cat + ' · ' + ev.venue + (ev.price ? ' · ' + ev.price : '') + '</div>' +
+            '<div class="rwhy">' + (ev.why || '') + '</div>' +
+          '</div>' +
+          '<div class="rcta">' +
+            '<a href="' + ev.url + '" target="_blank" rel="noopener">Tickets ↗</a>' +
+            '<button class="' + (st === 'interested' ? 'on' : '') + '" data-st="interested">' + (st === 'interested' ? '★ Interested' : '☆ Interested') + '</button>' +
+            '<button class="' + (st === 'booked' ? 'on' : '') + '" data-st="booked">' + (st === 'booked' ? '✓ Booked' : 'Mark booked') + '</button>' +
+            '<button class="rremove" data-st="dismissed" title="Remove from app">✕</button>' +
+          '</div>';
+        div.querySelectorAll('button[data-st]').forEach(btn => btn.addEventListener('click', () => toggleStatus(ev.id, btn.dataset.st)));
+        return div;
+      };
+      const group = (label, arr) => {
+        if (!arr.length) return;
+        const h = document.createElement('div');
+        h.className = 'radar-sub';
+        h.textContent = label;
+        listEl.appendChild(h);
+        arr.forEach(x => listEl.appendChild(item(x)));
+      };
+      group('Book ahead — sells out / presale', book);
+      group('Closing this week', closing);
     }
-    const item = ({ ev, act }) => {
-      const st = statusMap[ev.id] || 'none';
-      const div = document.createElement('div');
-      div.className = 'radar-item';
-      div.innerHTML =
-        '<div class="when ' + act.cls + '">' + act.label + '</div>' +
-        '<div class="rbody">' +
-          '<div class="rtitle"><a href="' + ev.url + '" target="_blank" rel="noopener">' + ev.title + '</a></div>' +
-          '<div class="rmeta">' + ev.cat + ' · ' + ev.venue + (ev.price ? ' · ' + ev.price : '') + '</div>' +
-          '<div class="rwhy">' + (ev.why || '') + '</div>' +
-        '</div>' +
-        '<div class="rcta">' +
-          '<a href="' + ev.url + '" target="_blank" rel="noopener">Tickets ↗</a>' +
-          '<button class="' + (st === 'interested' ? 'on' : '') + '" data-st="interested">' + (st === 'interested' ? '★ Interested' : '☆ Interested') + '</button>' +
-          '<button class="' + (st === 'booked' ? 'on' : '') + '" data-st="booked">' + (st === 'booked' ? '✓ Booked' : 'Mark booked') + '</button>' +
-        '</div>';
-      div.querySelectorAll('button[data-st]').forEach(btn => {
-        btn.addEventListener('click', () => toggleStatus(ev.id, btn.dataset.st));
-      });
-      return div;
-    };
-    const group = (label, arr) => {
-      if (!arr.length) return;
-      const h = document.createElement('div');
-      h.className = 'radar-sub';
-      h.textContent = label;
-      el.appendChild(h);
-      arr.forEach(x => el.appendChild(item(x)));
-    };
-    group('Book ahead — sells out / presale', book);
-    group('Closing this week', closing);
-  }
+    sec.appendChild(listEl);
+    wrap.appendChild(sec);
 
-  // ── RENDER ──────────────────────────────────────────────────
-  function render() {
-    // Dateline
-    document.getElementById('dateline-date').textContent =
-      TODAY.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
-
-    // Intro stats
-    const interestedCount = Object.values(statusMap).filter(s => s === 'interested').length;
-    const bookedCount = Object.values(statusMap).filter(s => s === 'booked').length;
-    const closingCount = events.filter(ev => {
-      const d = daysUntil(ev.end);
-      return d >= 0 && d <= SOON_DAYS;
-    }).length;
-    document.getElementById('intro-line').innerHTML =
-      'Tracking <em>' + events.length + '</em> events <span class="dot">·</span> ' +
-      '<em>' + interestedCount + '</em> on your shortlist <span class="dot">·</span> ' +
-      '<em>' + bookedCount + '</em> booked <span class="dot">·</span> ' +
-      '<em>' + closingCount + '</em> closing within a fortnight.';
-
-    renderRadar();
-
-    // Weekend
-    const weekendEvents = events.filter(isThisWeekend).sort((a,b) => new Date(a.start) - new Date(b.start));
-    const weekendEl = document.getElementById('weekend');
-    document.getElementById('weekend-count').textContent = weekendEvents.length + ' listing' + (weekendEvents.length === 1 ? '' : 's');
-    weekendEl.innerHTML = '';
-    if (!weekendEvents.length) {
-      weekendEl.innerHTML = '<div class="empty">Nothing matched for this weekend.</div>';
-    }
+    const weekendEvents = live().filter(isThisWeekend).sort((a, b) => new Date(a.start) - new Date(b.start));
+    const wsec = document.createElement('section');
+    wsec.innerHTML = banner('This Weekend', weekendEvents.length + ' listing' + (weekendEvents.length === 1 ? '' : 's')) +
+      '<p class="weekend-intro">A selection of what’s worth your Friday through Sunday.</p>';
+    const wl = document.createElement('div');
+    wl.className = 'weekend-list';
+    if (!weekendEvents.length) wl.innerHTML = '<div class="empty">Nothing matched for this weekend.</div>';
     weekendEvents.forEach(ev => {
       const div = document.createElement('div');
       div.className = 'weekend-item';
@@ -563,116 +551,139 @@
         '<div class="body">' +
           '<p class="name"><a href="' + ev.url + '" target="_blank" rel="noopener">' + ev.title + '</a></p>' +
           '<p><span class="venue">' + ev.venue + ', ' + ev.hood + '.</span></p>' +
-          '<p class="desc">' + ev.why + '</p>' +
+          '<p class="desc">' + (ev.why || '') + '</p>' +
         '</div>';
-      weekendEl.appendChild(div);
+      wl.appendChild(div);
     });
+    wsec.appendChild(wl);
+    wrap.appendChild(wsec);
+    return wrap;
+  }
 
-    // Filtered listings
-    const filtered = events.filter(ev => {
-      if (filters.cat !== 'all' && ev.cat !== filters.cat) return false;
-      const s = statusMap[ev.id] || 'none';
-      if (filters.status !== 'all') {
-        if (filters.status === 'none' && s !== 'none') return false;
-        if (filters.status !== 'none' && s !== filters.status) return false;
-      }
-      if (filters.soon) {
-        const d = daysUntil(ev.end);
-        if (d < 0 || d > SOON_DAYS) return false;
-      }
-      if (filters.search) {
-        const q = filters.search.toLowerCase();
-        const hay = (ev.title + ' ' + ev.venue + ' ' + ev.hood + ' ' + ev.cat + ' ' + ev.why).toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-      if (filters.foryou && tasteScore(ev) < FORYOU_MIN) return false;
-      return true;
-    }).sort((a, b) => filters.foryou ? (tasteScore(b) - tasteScore(a)) : (new Date(a.end) - new Date(b.end)));
-
-    const list = document.getElementById('listings');
-    list.innerHTML = '';
-    document.getElementById('filtered-count').textContent = filtered.length + ' listing' + (filtered.length === 1 ? '' : 's');
-
-    if (!filtered.length) {
-      list.innerHTML = '<div class="empty">No listings match these filters.</div>';
+  // ── CATEGORY VIEW ───────────────────────────────────────────
+  function buildCategoryView(cat) {
+    const wrap = document.createElement('div');
+    const sec = document.createElement('section');
+    const statuses = [['all','All'],['interested','Interested'],['booked','Booked'],['seen','Seen'],['none','Unmarked']];
+    sec.innerHTML =
+      banner(cat, '') +
+      '<div class="controls"><div class="row">' +
+        '<span class="lbl">Status</span>' +
+        statuses.map(([v,l]) => '<button class="chip' + (filters.status===v?' on':'') + '" data-status="' + v + '">' + l + '</button>').join('') +
+        '<button class="chip foryou' + (filters.foryou?' on':'') + '" data-f="foryou" style="margin-left:auto">★ For you</button>' +
+        '<button class="chip red' + (filters.soon?' on':'') + '" data-f="soon">Closing soon</button>' +
+      '</div><div class="row"><span class="lbl">Search</span>' +
+        '<input class="search" id="cat-search" type="search" placeholder="title, venue, neighborhood…"></div></div>';
+    const list = document.createElement('div');
+    list.className = 'listings';
+    const cnt = sec.querySelector('.count');
+    function paint() {
+      const filtered = live().filter(ev => {
+        if (ev.cat !== cat) return false;
+        const s = statusMap[ev.id] || 'none';
+        if (filters.status !== 'all') {
+          if (filters.status === 'none' && s !== 'none') return false;
+          if (filters.status !== 'none' && s !== filters.status) return false;
+        }
+        if (filters.soon) { const d = daysUntil(ev.end); if (d < 0 || d > SOON_DAYS) return false; }
+        if (filters.foryou && tasteScore(ev) < FORYOU_MIN) return false;
+        if (filters.search) {
+          const q = filters.search.toLowerCase();
+          const hay = (ev.title + ' ' + ev.venue + ' ' + ev.hood + ' ' + ev.cat + ' ' + ev.why).toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      }).sort((a, b) => filters.foryou ? (tasteScore(b) - tasteScore(a)) : (new Date(a.end) - new Date(b.end)));
+      cnt.textContent = filtered.length + ' listing' + (filtered.length === 1 ? '' : 's');
+      list.innerHTML = '';
+      if (!filtered.length) { list.innerHTML = '<div class="empty">No listings match these filters.</div>'; return; }
+      filtered.forEach((ev, i) => list.appendChild(buildListing(ev, i)));
     }
+    sec.appendChild(list);
+    sec.querySelectorAll('.chip[data-status]').forEach(b => b.addEventListener('click', () => {
+      sec.querySelectorAll('.chip[data-status]').forEach(x => x.classList.remove('on'));
+      b.classList.add('on'); filters.status = b.dataset.status; paint();
+    }));
+    sec.querySelector('[data-f="foryou"]').addEventListener('click', e => { filters.foryou = !filters.foryou; e.currentTarget.classList.toggle('on', filters.foryou); paint(); });
+    sec.querySelector('[data-f="soon"]').addEventListener('click', e => { filters.soon = !filters.soon; e.currentTarget.classList.toggle('on', filters.soon); paint(); });
+    const si = sec.querySelector('#cat-search');
+    si.value = filters.search;
+    si.addEventListener('input', e => { filters.search = e.target.value; paint(); });
+    paint();
+    wrap.appendChild(sec);
+    return wrap;
+  }
 
-    filtered.forEach((ev, idx) => {
-      const status = statusMap[ev.id] || 'none';
+  // ── REMOVED VIEW ────────────────────────────────────────────
+  function buildRemovedView() {
+    const wrap = document.createElement('div');
+    const sec = document.createElement('section');
+    const removed = events.filter(ev => statusMap[ev.id] === 'dismissed');
+    sec.innerHTML = banner('Removed', removed.length + ' hidden');
+    const list = document.createElement('div');
+    if (!removed.length) list.innerHTML = '<div class="empty">Nothing removed.</div>';
+    removed.forEach(ev => {
       const div = document.createElement('div');
-      div.className = 'listing' + (idx === 0 ? ' first' : '') + (status !== 'none' ? ' ' + status : '');
-
-      const cb = closingBadge(ev.end);
-      const fb = futureBadge(ev.start);
-      const wk = isThisWeekend(ev) ? '<span class="badge weekend">This weekend</span>' : '';
-      const closeB = cb ? '<span class="badge ' + cb.cls + '">' + cb.text + '</span>' : '';
-      const futB = fb ? '<span class="badge future">' + fb.text + '</span>' : '';
-      const fy = tasteScore(ev) >= FORYOU_MIN ? '<span class="badge foryou">For you</span>' : '';
-
-      div.innerHTML =
-        '<div class="l-head">' +
-          '<span class="l-cat">' + ev.cat + '</span>' +
-          '<span class="l-dates"><em>' + fmtEditorialRun(ev.start, ev.end) + '</em>' +
-            '<span class="badges">' + fy + wk + closeB + futB + '</span>' +
-          '</span>' +
-        '</div>' +
-        '<h3 class="l-title"><a href="' + ev.url + '" target="_blank" rel="noopener">' + ev.title + '</a></h3>' +
-        '<div class="l-venue"><span class="where">' + ev.venue + '</span>' +
-          '<span class="neighborhood">' + ev.hood + '</span>' +
-          '<span class="price">' + ev.price + '</span>' +
-        '</div>' +
-        '<p class="l-why">' + ev.why + '</p>' +
-        '<div class="l-actions">' +
-          '<button class="act ' + (status==='interested'?'on-interested':'') + '" data-st="interested">' +
-            (status==='interested'?'★ Interested':'☆ Interested') + '</button>' +
-          '<button class="act ' + (status==='booked'?'on-booked':'') + '" data-st="booked">' +
-            (status==='booked'?'✓ Booked':'Mark booked') + '</button>' +
-          '<button class="act ' + (status==='seen'?'on-seen':'') + '" data-st="seen">' +
-            (status==='seen'?'● Seen':'Mark seen') + '</button>' +
-          '<span class="sep">·</span>' +
-          '<a class="act" href="' + ev.url + '" target="_blank" rel="noopener">Tickets ↗</a>' +
-          '<a class="act" href="' + gcalUrl(ev) + '" target="_blank" rel="noopener">Add to calendar</a>' +
-        '</div>';
-
-      div.querySelectorAll('button.act[data-st]').forEach(btn => {
-        btn.addEventListener('click', () => toggleStatus(ev.id, btn.dataset.st));
-      });
-
+      div.className = 'removed-item';
+      div.innerHTML = '<span>' + ev.title + ' <em>· ' + ev.cat + '</em></span>';
+      const b = document.createElement('button');
+      b.className = 'act'; b.textContent = 'Restore';
+      b.addEventListener('click', () => toggleStatus(ev.id, 'dismissed'));
+      div.appendChild(b);
       list.appendChild(div);
+    });
+    sec.appendChild(list);
+    wrap.appendChild(sec);
+    return wrap;
+  }
+
+  // ── TABS + DISPATCH ─────────────────────────────────────────
+  function renderTabs() {
+    const removedCount = events.filter(ev => statusMap[ev.id] === 'dismissed').length;
+    const tabs = ['Radar', ...categoriesInData()];
+    if (removedCount) tabs.push('Removed');
+    if (!tabs.includes(activeTab)) activeTab = 'Radar';
+    const nav = document.getElementById('tabs');
+    nav.innerHTML = '';
+    tabs.forEach(t => {
+      const b = document.createElement('button');
+      b.className = 'tab' + (t === activeTab ? ' on' : '');
+      let n = '';
+      if (t === 'Radar') n = live().filter(ev => radarAction(ev)).length;
+      else if (t === 'Removed') n = removedCount;
+      else n = live().filter(ev => ev.cat === t).length;
+      b.innerHTML = t + (n ? ' <span class="tcount">' + n + '</span>' : '');
+      b.addEventListener('click', () => { activeTab = t; render(); window.scrollTo(0, 0); });
+      nav.appendChild(b);
     });
   }
 
-  // ── FILTER BINDINGS ─────────────────────────────────────────
-  document.querySelectorAll('.chip[data-cat]').forEach(b => {
-    b.addEventListener('click', () => {
-      document.querySelectorAll('.chip[data-cat]').forEach(x => x.classList.remove('on'));
-      b.classList.add('on');
-      filters.cat = b.dataset.cat;
-      render();
-    });
-  });
-  document.querySelectorAll('.chip[data-status]').forEach(b => {
-    b.addEventListener('click', () => {
-      document.querySelectorAll('.chip[data-status]').forEach(x => x.classList.remove('on'));
-      b.classList.add('on');
-      filters.status = b.dataset.status;
-      render();
-    });
-  });
-  document.getElementById('filter-soon').addEventListener('click', () => {
-    filters.soon = !filters.soon;
-    document.getElementById('filter-soon').classList.toggle('on', filters.soon);
-    render();
-  });
-  document.getElementById('filter-foryou').addEventListener('click', () => {
-    filters.foryou = !filters.foryou;
-    document.getElementById('filter-foryou').classList.toggle('on', filters.foryou);
-    render();
-  });
-  document.getElementById('search').addEventListener('input', e => {
-    filters.search = e.target.value;
-    render();
-  });
+  function renderView() {
+    const view = document.getElementById('view');
+    view.innerHTML = '';
+    let node;
+    if (activeTab === 'Radar') node = buildRadarView();
+    else if (activeTab === 'Removed') node = buildRemovedView();
+    else node = buildCategoryView(activeTab);
+    view.appendChild(node);
+  }
+
+  // ── RENDER ──────────────────────────────────────────────────
+  function render() {
+    document.getElementById('dateline-date').textContent =
+      TODAY.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+    const L = live();
+    const actNow = L.filter(ev => radarAction(ev)).length;
+    const interestedCount = L.filter(ev => statusMap[ev.id] === 'interested').length;
+    const bookedCount = L.filter(ev => statusMap[ev.id] === 'booked').length;
+    document.getElementById('intro-line').innerHTML =
+      '<em>' + actNow + '</em> to act on <span class="dot">·</span> ' +
+      '<em>' + L.length + '</em> events tracked <span class="dot">·</span> ' +
+      '<em>' + interestedCount + '</em> shortlisted <span class="dot">·</span> ' +
+      '<em>' + bookedCount + '</em> booked.';
+    renderTabs();
+    renderView();
+  }
 
   // ── BOOT (no auth — public app, queries hardcoded to JULI_USER_ID) ──
   await Promise.all([loadEvents(), loadStatus()]);
