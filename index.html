@@ -357,7 +357,7 @@
 
   // ── TASTE PROFILE (mirrors assistant_preferences.data.culture.taste) ──
   const TASTE = {
-    cat: { Art:5, Film:5, Theatre:4, Classical:4, Concert:3, Opera:2, Ballet:2 },
+    cat: { 'Art Galleries':5, 'Museum Exhibits':5, Art:5, Film:5, Theatre:4, Classical:4, Concert:3, Opera:2, Ballet:2 },
     venues: ['film forum','ifc','metrograph','angelika','quad','roxy','bam','nitehawk','maysles','noguchi','moma','guggenheim','japan society','brooklyn museum','judd','marianne boesky','alexander gray','salon 94','perrotin','levy gorvy','berry campbell','nino mier','gagosian','vineyard','atlantic','koch','carnegie','met opera','brooklyn paramount','armory','greenwich house'],
     cues: ['noguchi','ozu','hamaguchi','japan','japanese','sakamoto','mishima','kogonada','duchamp','modernism','modernist','kahlo','rivera','frankenthaler','semmel','mckinney','brancusi','krasner','pollock','balanchine','van herpen','bunuel','spanish','latin','korean','james blake','lafourcade','dudamel','premiere','retrospective','auteur'],
     avoid: ['jukebox','arena','tourist','broadway musical','immersive experience']
@@ -441,7 +441,7 @@
   // ── VIEW HELPERS ────────────────────────────────────────────
   let activeTab = 'Radar';
   const live = () => events.filter(ev => statusMap[ev.id] !== 'dismissed');
-  const CAT_ORDER = ['Art','Film','Theatre','Classical','Concert','Opera','Ballet','Dance'];
+  const CAT_ORDER = ['Art Galleries','Museum Exhibits','Film','Theatre','Classical','Concert','Opera','Ballet','Dance'];
   function categoriesInData() {
     const present = [...new Set(live().map(ev => ev.cat).filter(Boolean))];
     return present.sort((a, b) => (((CAT_ORDER.indexOf(a) + 1) || 99) - ((CAT_ORDER.indexOf(b) + 1) || 99)));
