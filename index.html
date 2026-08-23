@@ -416,11 +416,12 @@
   function radarAction(ev) {
     const st = statusMap[ev.id] || 'none';
     if (st === 'booked' || st === 'seen') return null;
-    if (ev.bookingOpens && new Date(ev.bookingOpens) >= TODAY) {
-      return { date: new Date(ev.bookingOpens), label: (ev.membership ? ev.membership + ' presale ' : 'Presale ') + fmtShort(ev.bookingOpens), cls: 'opens' };
+    const fd = d => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    if (ev.bookingOpens && new Date(ev.bookingOpens + 'T12:00:00') >= TODAY) {
+      return { date: new Date(ev.bookingOpens + 'T12:00:00'), label: (ev.membership ? ev.membership + ' presale ' : 'Presale ') + fd(ev.bookingOpens), cls: 'opens' };
     }
     if (ev.bookingDeadline && daysUntil(ev.bookingDeadline) >= 0) {
-      return { date: new Date(ev.bookingDeadline), label: 'Book by ' + fmtShort(ev.bookingDeadline), cls: 'now' };
+      return { date: new Date(ev.bookingDeadline + 'T12:00:00'), label: 'Book by ' + fd(ev.bookingDeadline), cls: 'now' };
     }
     if (ev.advance && new Date(ev.end) >= TODAY) {
       return { date: new Date(ev.start), label: 'On sale — books out', cls: 'now' };
