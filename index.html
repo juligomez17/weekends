@@ -187,6 +187,7 @@
   .radar-item .rcta a:hover, .radar-item .rcta button:hover { color: var(--red); border-bottom-color: var(--red); }
   .radar-item .rcta button.on { color: var(--ink); border-bottom-color: var(--ink); font-weight: 500; }
   .radar-empty { padding: 16px 0; font-style: italic; color: var(--ink-3); }
+  .radar-sub { font-family: var(--serif); font-variant: small-caps; font-size: 12px; letter-spacing: 0.16em; color: var(--ink-3); padding: 16px 0 2px; border-bottom: 1px solid var(--rule); }
   .badge.foryou { color: var(--red); font-weight: 500; }
   .chip.foryou.on { color: var(--red); border-bottom-color: var(--red); font-weight: 500; }
   @media (max-width: 640px) {
@@ -481,18 +482,17 @@
     const el = document.getElementById('radar');
     const cnt = document.getElementById('radar-count');
     if (!el) return;
-    const items = events
-      .map(ev => ({ ev, act: radarAction(ev) }))
-      .filter(x => x.act)
-      .sort((a, b) => a.act.date - b.act.date)
-      .slice(0, 8);
-    cnt.textContent = items.length ? items.length + ' to act on' : '';
+    const scored = events.map(ev => ({ ev, act: radarAction(ev) })).filter(x => x.act);
+    const book = scored.filter(x => x.act.cls !== 'soft').sort((a, b) => a.act.date - b.act.date);
+    const closing = scored.filter(x => x.act.cls === 'soft').sort((a, b) => a.act.date - b.act.date).slice(0, 6);
+    const total = book.length + closing.length;
+    cnt.textContent = total ? total + ' to act on' : '';
     el.innerHTML = '';
-    if (!items.length) {
+    if (!total) {
       el.innerHTML = '<div class="radar-empty">Nothing needs booking right now — you’re clear.</div>';
       return;
     }
-    items.forEach(({ ev, act }) => {
+    const item = ({ ev, act }) => {
       const st = statusMap[ev.id] || 'none';
       const div = document.createElement('div');
       div.className = 'radar-item';
@@ -511,8 +511,18 @@
       div.querySelectorAll('button[data-st]').forEach(btn => {
         btn.addEventListener('click', () => toggleStatus(ev.id, btn.dataset.st));
       });
-      el.appendChild(div);
-    });
+      return div;
+    };
+    const group = (label, arr) => {
+      if (!arr.length) return;
+      const h = document.createElement('div');
+      h.className = 'radar-sub';
+      h.textContent = label;
+      el.appendChild(h);
+      arr.forEach(x => el.appendChild(item(x)));
+    };
+    group('Book ahead — sells out / presale', book);
+    group('Closing this week', closing);
   }
 
   // ── RENDER ──────────────────────────────────────────────────
