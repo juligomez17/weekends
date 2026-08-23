@@ -172,6 +172,28 @@
   .empty { text-align: center; padding: 48px 0; font-style: italic; color: var(--ink-3); }
   .loading { text-align: center; padding: 48px 0; font-style: italic; color: var(--ink-3); }
 
+  /* ── ON YOUR RADAR (ACT SOON) ── */
+  .radar-list { border-top: 2px solid var(--ink); }
+  .radar-item { padding: 14px 0; border-bottom: 1px solid var(--rule); display: grid; grid-template-columns: 132px 1fr auto; gap: 16px; align-items: baseline; }
+  .radar-item .when { font-family: var(--serif); font-variant: small-caps; font-weight: 500; font-size: 12px; letter-spacing: 0.07em; padding-top: 2px; }
+  .radar-item .when.now { color: var(--red); }
+  .radar-item .when.opens { color: var(--ink); }
+  .radar-item .when.soft { color: var(--ink-3); }
+  .radar-item .rbody .rtitle { font-family: var(--serif); font-style: italic; font-size: 18px; line-height: 1.2; }
+  .radar-item .rbody .rmeta { font-size: 13px; color: var(--ink-2); font-style: italic; margin-top: 2px; }
+  .radar-item .rbody .rwhy { font-size: 13.5px; color: var(--ink-2); margin-top: 4px; }
+  .radar-item .rcta { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; text-align: right; }
+  .radar-item .rcta a, .radar-item .rcta button { font-family: var(--serif); font-style: italic; font-size: 12.5px; color: var(--ink-2); background: none; border: none; border-bottom: 1px solid var(--rule-2); padding: 0 0 1px; white-space: nowrap; }
+  .radar-item .rcta a:hover, .radar-item .rcta button:hover { color: var(--red); border-bottom-color: var(--red); }
+  .radar-item .rcta button.on { color: var(--ink); border-bottom-color: var(--ink); font-weight: 500; }
+  .radar-empty { padding: 16px 0; font-style: italic; color: var(--ink-3); }
+  .badge.foryou { color: var(--red); font-weight: 500; }
+  .chip.foryou.on { color: var(--red); border-bottom-color: var(--red); font-weight: 500; }
+  @media (max-width: 640px) {
+    .radar-item { grid-template-columns: 1fr; gap: 5px; }
+    .radar-item .rcta { flex-direction: row; gap: 14px; align-items: baseline; margin-top: 6px; }
+  }
+
   /* COLOPHON */
   .colophon { margin-top: 56px; padding-top: 24px; border-top: 2px solid var(--ink); text-align: center; font-family: var(--serif); font-style: italic; font-size: 12px; color: var(--ink-3); letter-spacing: 0.04em; }
   .colophon .ornament { display: block; margin: 0 auto 12px; font-size: 14px; color: var(--rule-2); letter-spacing: 0.6em; }
@@ -206,6 +228,15 @@
     </header>
 
     <p class="intro" id="intro-line"></p>
+
+    <section class="radar">
+      <div class="banner">
+        <span class="label">On Your Radar — Act Soon</span>
+        <span class="rule"></span>
+        <span class="count" id="radar-count"></span>
+      </div>
+      <div class="radar-list" id="radar"><div class="loading">Checking your radar…</div></div>
+    </section>
 
     <section>
       <div class="banner">
@@ -243,7 +274,8 @@
           <button class="chip" data-status="booked">Booked</button>
           <button class="chip" data-status="seen">Seen</button>
           <button class="chip" data-status="none">Unmarked</button>
-          <button class="chip red" id="filter-soon" style="margin-left:auto">Closing soon</button>
+          <button class="chip foryou" id="filter-foryou" style="margin-left:auto">★ For you</button>
+          <button class="chip red" id="filter-soon">Closing soon</button>
         </div>
         <div class="row">
           <span class="lbl">Search</span>
@@ -360,7 +392,44 @@
   // ── STATE ────────────────────────────────────────────────────
   let events = [];
   let statusMap = {};
-  const filters = { cat: 'all', status: 'all', soon: false, search: '' };
+  const filters = { cat: 'all', status: 'all', soon: false, foryou: false, search: '' };
+
+  // ── TASTE PROFILE (mirrors assistant_preferences.data.culture.taste) ──
+  const TASTE = {
+    cat: { Art:5, Film:5, Theatre:4, Classical:4, Concert:3, Opera:2, Ballet:2 },
+    venues: ['film forum','ifc','metrograph','angelika','quad','roxy','bam','nitehawk','maysles','noguchi','moma','guggenheim','japan society','brooklyn museum','judd','marianne boesky','alexander gray','salon 94','perrotin','levy gorvy','berry campbell','nino mier','gagosian','vineyard','atlantic','koch','carnegie','met opera','brooklyn paramount','armory','greenwich house'],
+    cues: ['noguchi','ozu','hamaguchi','japan','japanese','sakamoto','mishima','kogonada','duchamp','modernism','modernist','kahlo','rivera','frankenthaler','semmel','mckinney','brancusi','krasner','pollock','balanchine','van herpen','bunuel','spanish','latin','korean','james blake','lafourcade','dudamel','premiere','retrospective','auteur'],
+    avoid: ['jukebox','arena','tourist','broadway musical','immersive experience']
+  };
+  const FORYOU_MIN = 9;
+  function tasteScore(ev) {
+    let s = TASTE.cat[ev.cat] || 2;
+    const hay = ((ev.title||'') + ' ' + (ev.venue||'') + ' ' + (ev.why||'')).toLowerCase();
+    if (TASTE.venues.some(v => hay.includes(v))) s += 4;
+    TASTE.cues.forEach(c => { if (hay.includes(c)) s += 2; });
+    if (TASTE.avoid.some(a => hay.includes(a))) s -= 6;
+    return s;
+  }
+
+  // ── BOOKING RADAR: what needs action, and when ──
+  function radarAction(ev) {
+    const st = statusMap[ev.id] || 'none';
+    if (st === 'booked' || st === 'seen') return null;
+    if (ev.bookingOpens && new Date(ev.bookingOpens) >= TODAY) {
+      return { date: new Date(ev.bookingOpens), label: (ev.membership ? ev.membership + ' presale ' : 'Presale ') + fmtShort(ev.bookingOpens), cls: 'opens' };
+    }
+    if (ev.bookingDeadline && daysUntil(ev.bookingDeadline) >= 0) {
+      return { date: new Date(ev.bookingDeadline), label: 'Book by ' + fmtShort(ev.bookingDeadline), cls: 'now' };
+    }
+    if (ev.advance && new Date(ev.end) >= TODAY) {
+      return { date: new Date(ev.start), label: 'On sale — books out', cls: 'now' };
+    }
+    const d = daysUntil(ev.end);
+    if (d >= 0 && d <= SOON_DAYS) {
+      return { date: new Date(ev.end), label: d === 0 ? 'Closes today' : 'Closes in ' + d + 'd', cls: 'soft' };
+    }
+    return null;
+  }
 
   // ── DATA ─────────────────────────────────────────────────────
   async function loadEvents() {
@@ -372,7 +441,8 @@
     if (error) { console.error(error); return; }
     events = data.map(r => ({
       id: r.id, title: r.title, cat: r.category, venue: r.venue, hood: r.neighborhood,
-      start: r.start_date, end: r.end_date, price: r.price, url: r.url, why: r.why
+      start: r.start_date, end: r.end_date, price: r.price, url: r.url, why: r.why,
+      advance: r.advance_required, bookingOpens: r.booking_opens, bookingDeadline: r.booking_deadline, membership: r.membership
     }));
   }
 
@@ -406,6 +476,45 @@
     }
   }
 
+  // ── BOOKING RADAR RENDER ────────────────────────────────────
+  function renderRadar() {
+    const el = document.getElementById('radar');
+    const cnt = document.getElementById('radar-count');
+    if (!el) return;
+    const items = events
+      .map(ev => ({ ev, act: radarAction(ev) }))
+      .filter(x => x.act)
+      .sort((a, b) => a.act.date - b.act.date)
+      .slice(0, 8);
+    cnt.textContent = items.length ? items.length + ' to act on' : '';
+    el.innerHTML = '';
+    if (!items.length) {
+      el.innerHTML = '<div class="radar-empty">Nothing needs booking right now — you’re clear.</div>';
+      return;
+    }
+    items.forEach(({ ev, act }) => {
+      const st = statusMap[ev.id] || 'none';
+      const div = document.createElement('div');
+      div.className = 'radar-item';
+      div.innerHTML =
+        '<div class="when ' + act.cls + '">' + act.label + '</div>' +
+        '<div class="rbody">' +
+          '<div class="rtitle"><a href="' + ev.url + '" target="_blank" rel="noopener">' + ev.title + '</a></div>' +
+          '<div class="rmeta">' + ev.cat + ' · ' + ev.venue + (ev.price ? ' · ' + ev.price : '') + '</div>' +
+          '<div class="rwhy">' + (ev.why || '') + '</div>' +
+        '</div>' +
+        '<div class="rcta">' +
+          '<a href="' + ev.url + '" target="_blank" rel="noopener">Tickets ↗</a>' +
+          '<button class="' + (st === 'interested' ? 'on' : '') + '" data-st="interested">' + (st === 'interested' ? '★ Interested' : '☆ Interested') + '</button>' +
+          '<button class="' + (st === 'booked' ? 'on' : '') + '" data-st="booked">' + (st === 'booked' ? '✓ Booked' : 'Mark booked') + '</button>' +
+        '</div>';
+      div.querySelectorAll('button[data-st]').forEach(btn => {
+        btn.addEventListener('click', () => toggleStatus(ev.id, btn.dataset.st));
+      });
+      el.appendChild(div);
+    });
+  }
+
   // ── RENDER ──────────────────────────────────────────────────
   function render() {
     // Dateline
@@ -424,6 +533,8 @@
       '<em>' + interestedCount + '</em> on your shortlist <span class="dot">·</span> ' +
       '<em>' + bookedCount + '</em> booked <span class="dot">·</span> ' +
       '<em>' + closingCount + '</em> closing within a fortnight.';
+
+    renderRadar();
 
     // Weekend
     const weekendEvents = events.filter(isThisWeekend).sort((a,b) => new Date(a.start) - new Date(b.start));
@@ -463,8 +574,9 @@
         const hay = (ev.title + ' ' + ev.venue + ' ' + ev.hood + ' ' + ev.cat + ' ' + ev.why).toLowerCase();
         if (!hay.includes(q)) return false;
       }
+      if (filters.foryou && tasteScore(ev) < FORYOU_MIN) return false;
       return true;
-    }).sort((a, b) => new Date(a.end) - new Date(b.end));
+    }).sort((a, b) => filters.foryou ? (tasteScore(b) - tasteScore(a)) : (new Date(a.end) - new Date(b.end)));
 
     const list = document.getElementById('listings');
     list.innerHTML = '';
@@ -484,12 +596,13 @@
       const wk = isThisWeekend(ev) ? '<span class="badge weekend">This weekend</span>' : '';
       const closeB = cb ? '<span class="badge ' + cb.cls + '">' + cb.text + '</span>' : '';
       const futB = fb ? '<span class="badge future">' + fb.text + '</span>' : '';
+      const fy = tasteScore(ev) >= FORYOU_MIN ? '<span class="badge foryou">For you</span>' : '';
 
       div.innerHTML =
         '<div class="l-head">' +
           '<span class="l-cat">' + ev.cat + '</span>' +
           '<span class="l-dates"><em>' + fmtEditorialRun(ev.start, ev.end) + '</em>' +
-            '<span class="badges">' + wk + closeB + futB + '</span>' +
+            '<span class="badges">' + fy + wk + closeB + futB + '</span>' +
           '</span>' +
         '</div>' +
         '<h3 class="l-title"><a href="' + ev.url + '" target="_blank" rel="noopener">' + ev.title + '</a></h3>' +
@@ -538,6 +651,11 @@
   document.getElementById('filter-soon').addEventListener('click', () => {
     filters.soon = !filters.soon;
     document.getElementById('filter-soon').classList.toggle('on', filters.soon);
+    render();
+  });
+  document.getElementById('filter-foryou').addEventListener('click', () => {
+    filters.foryou = !filters.foryou;
+    document.getElementById('filter-foryou').classList.toggle('on', filters.foryou);
     render();
   });
   document.getElementById('search').addEventListener('input', e => {
